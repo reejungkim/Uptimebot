@@ -1,0 +1,22 @@
+# Core dependencies
+requests>=2.31.0
+schedule>=1.2.0
+python-dotenv>=1.0.0
+pyyaml>=6.0.1
+
+# Development dependencies
+pytest>=7.4.0
+pytest-cov>=4.1.0
+pytest-mock>=3.11.1
+black>=23.7.0
+flake8>=6.0.0
+mypy>=1.5.0
+
+# Optional dependencies for enhanced functionality
+# Uncomment as needed
+# psycopg2-binary>=2.9.7  # PostgreSQL support
+# mysql-connector-python>=8.1.0  # MySQL support
+# redis>=4.6.0  # Redis support for caching
+# celery>=5.3.0  # Distributed task queue
+# prometheus-client>=0.17.0  # Prometheus metrics
+# grafana-api>=1.0.3  # Grafana integration
