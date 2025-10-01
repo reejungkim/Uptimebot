@@ -1,0 +1,146 @@
+{
+  "master": {
+    "tasks": [
+      {
+        "id": 1,
+        "title": "Setup Project Structure and Dependencies",
+        "description": "Initialize the project repository with basic structure and install required dependencies",
+        "details": "Create a new Python project with the following structure:\n- `uptime_agent/` (main package)\n  - `__init__.py`\n  - `scheduler.py`\n  - `http_client.py`\n  - `config.py`\n  - `models.py`\n  - `logger.py`\n- `tests/`\n- `requirements.txt`\n- `.env.example`\n- `README.md`\n\nAdd the following dependencies to requirements.txt:\n- requests (for HTTP client)\n- schedule (for scheduler)\n- python-dotenv (for env config)\n- pyyaml (for YAML config)\n\nCreate a basic README with installation and usage instructions.",
+        "testStrategy": "Verify project structure is correct and all dependencies can be installed in a clean virtual environment. Run basic import tests to ensure all packages are accessible.",
+        "priority": "high",
+        "dependencies": [],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 2,
+        "title": "Implement Config Manager",
+        "description": "Create a configuration manager that can load settings from environment variables or YAML/JSON files",
+        "details": "In `config.py`, implement a ConfigManager class that:\n1. Loads configuration from .env file using python-dotenv\n2. Supports loading from YAML/JSON config files\n3. Provides default values for all settings\n4. Validates configuration values\n\nThe config should include:\n- List of app endpoints (URLs)\n- Ping intervals for each endpoint (default: 5 minutes)\n- Retry settings (attempts, delay)\n- Log settings\n\nExample implementation:\n```python\nclass ConfigManager:\n    def __init__(self, config_path=None):\n        self.config = {}\n        self._load_defaults()\n        if config_path:\n            self._load_from_file(config_path)\n        self._load_from_env()\n        self._validate()\n    \n    def _load_defaults(self):\n        self.config = {\n            'endpoints': [],\n            'default_interval': 300,  # 5 minutes in seconds\n            'retry_attempts': 3,\n            'retry_delay': 30,\n            'log_level': 'INFO'\n        }\n    \n    def _load_from_file(self, path):\n        # Load from YAML or JSON based on file extension\n        pass\n        \n    def _load_from_env(self):\n        # Override with environment variables\n        pass\n        \n    def _validate(self):\n        # Ensure config values are valid\n        pass\n```",
+        "testStrategy": "Write unit tests that verify:\n1. Default configuration is loaded correctly\n2. Environment variables override defaults\n3. YAML/JSON files are parsed correctly\n4. Configuration validation catches invalid values\n5. Test with sample configuration files",
+        "priority": "high",
+        "dependencies": [
+          1
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 3,
+        "title": "Create Data Models",
+        "description": "Implement data models for app endpoints and ping logs",
+        "details": "In `models.py`, create classes for the two main data models:\n\n1. AppEndpoint class:\n```python\nclass AppEndpoint:\n    def __init__(self, url, interval=300):\n        self.url = url\n        self.interval = interval  # in seconds\n        self.last_ping = None\n        self.status = 'unknown'\n        self.failure_count = 0\n    \n    def update_status(self, status, response_code=None):\n        self.status = status\n        self.last_ping = datetime.now()\n        if status == 'error':\n            self.failure_count += 1\n        else:\n            self.failure_count = 0\n```\n\n2. PingLog class:\n```python\nclass PingLog:\n    def __init__(self, url, response_code=None, latency=None):\n        self.timestamp = datetime.now()\n        self.url = url\n        self.response_code = response_code\n        self.latency = latency  # in milliseconds\n```\n\nImplement methods for serialization/deserialization to JSON for storage and retrieval.",
+        "testStrategy": "Write unit tests that verify:\n1. AppEndpoint objects initialize with correct default values\n2. Status updates work correctly\n3. PingLog objects capture all required data\n4. Serialization/deserialization works correctly for both models",
+        "priority": "high",
+        "dependencies": [
+          1
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 4,
+        "title": "Implement HTTP Client",
+        "description": "Create an HTTP client to send ping requests to app endpoints",
+        "details": "In `http_client.py`, implement an HTTPClient class that:\n\n1. Sends GET requests to specified URLs\n2. Handles timeouts and connection errors\n3. Measures response time\n4. Returns status and response information\n\n```python\nimport requests\nimport time\nfrom .models import PingLog\n\nclass HTTPClient:\n    def __init__(self, timeout=10):\n        self.timeout = timeout\n    \n    def ping(self, url):\n        start_time = time.time()\n        try:\n            response = requests.get(url, timeout=self.timeout)\n            latency = (time.time() - start_time) * 1000  # convert to ms\n            return {\n                'success': response.status_code < 400,\n                'status_code': response.status_code,\n                'latency': latency,\n                'error': None\n            }\n        except requests.RequestException as e:\n            latency = (time.time() - start_time) * 1000\n            return {\n                'success': False,\n                'status_code': None,\n                'latency': latency,\n                'error': str(e)\n            }\n    \n    def ping_and_log(self, url):\n        result = self.ping(url)\n        log = PingLog(\n            url=url,\n            response_code=result['status_code'],\n            latency=result['latency']\n        )\n        return result, log\n```\n\nAdd retry logic with exponential backoff for failed requests.",
+        "testStrategy": "Write unit tests that verify:\n1. Successful pings return correct status information\n2. Failed pings are handled gracefully\n3. Timeouts are respected\n4. Latency is measured correctly\n5. Retry logic works as expected\n6. Use mocking to avoid actual HTTP requests in tests",
+        "priority": "high",
+        "dependencies": [
+          3
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 5,
+        "title": "Implement Scheduler",
+        "description": "Create a scheduler to manage periodic pings to app endpoints",
+        "details": "In `scheduler.py`, implement a Scheduler class that:\n\n1. Uses the `schedule` library to manage periodic tasks\n2. Schedules pings for each app endpoint at its specified interval\n3. Supports adding/removing endpoints dynamically\n4. Adds jitter/randomization to ping intervals to avoid detection\n\n```python\nimport schedule\nimport time\nimport random\nfrom threading import Thread\n\nclass Scheduler:\n    def __init__(self, http_client):\n        self.http_client = http_client\n        self.endpoints = {}\n        self.running = False\n        self.thread = None\n    \n    def add_endpoint(self, endpoint):\n        # Add jitter to interval (±10%)\n        jitter = endpoint.interval * 0.1\n        actual_interval = endpoint.interval + random.uniform(-jitter, jitter)\n        \n        # Schedule the ping task\n        job = schedule.every(actual_interval).seconds.do(\n            self._ping_endpoint, endpoint\n        )\n        \n        self.endpoints[endpoint.url] = {\n            'endpoint': endpoint,\n            'job': job\n        }\n    \n    def remove_endpoint(self, url):\n        if url in self.endpoints:\n            schedule.cancel_job(self.endpoints[url]['job'])\n            del self.endpoints[url]\n    \n    def _ping_endpoint(self, endpoint):\n        result, log = self.http_client.ping_and_log(endpoint.url)\n        status = 'up' if result['success'] else 'down'\n        endpoint.update_status(status, result['status_code'])\n        return log\n    \n    def start(self):\n        if self.running:\n            return\n        \n        self.running = True\n        self.thread = Thread(target=self._run_scheduler)\n        self.thread.daemon = True\n        self.thread.start()\n    \n    def stop(self):\n        self.running = False\n        if self.thread:\n            self.thread.join(timeout=1)\n    \n    def _run_scheduler(self):\n        while self.running:\n            schedule.run_pending()\n            time.sleep(1)\n```",
+        "testStrategy": "Write unit tests that verify:\n1. Endpoints can be added and removed correctly\n2. Ping tasks are scheduled at the correct intervals\n3. Jitter is applied to intervals\n4. The scheduler can be started and stopped\n5. Use mocking to avoid actual scheduling in tests",
+        "priority": "high",
+        "dependencies": [
+          3,
+          4
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 6,
+        "title": "Implement Logging System",
+        "description": "Create a logging system to record ping results and application events",
+        "details": "In `logger.py`, implement a logging system that:\n\n1. Uses Python's built-in logging module\n2. Logs ping results (success/failure)\n3. Logs application events (startup, shutdown, config changes)\n4. Supports different log levels (INFO, WARNING, ERROR)\n5. Supports logging to console and file\n\n```python\nimport logging\nimport os\nfrom datetime import datetime\n\nclass Logger:\n    def __init__(self, log_level='INFO', log_file=None):\n        self.logger = logging.getLogger('uptime_agent')\n        self.logger.setLevel(getattr(logging, log_level))\n        \n        # Console handler\n        console_handler = logging.StreamHandler()\n        console_handler.setFormatter(logging.Formatter(\n            '%(asctime)s - %(levelname)s - %(message)s'\n        ))\n        self.logger.addHandler(console_handler)\n        \n        # File handler (optional)\n        if log_file:\n            file_handler = logging.FileHandler(log_file)\n            file_handler.setFormatter(logging.Formatter(\n                '%(asctime)s - %(levelname)s - %(message)s'\n            ))\n            self.logger.addHandler(file_handler)\n    \n    def log_ping(self, url, result):\n        if result['success']:\n            self.logger.info(f\"Ping successful: {url} - {result['status_code']} - {result['latency']:.2f}ms\")\n        else:\n            self.logger.error(f\"Ping failed: {url} - {result['error']}\")\n    \n    def log_event(self, event_type, message):\n        self.logger.info(f\"{event_type}: {message}\")\n    \n    def log_error(self, message, exception=None):\n        if exception:\n            self.logger.error(f\"{message}: {str(exception)}\")\n        else:\n            self.logger.error(message)\n```\n\nImplement a mechanism to store ping logs for later retrieval (for the dashboard in Phase 2).",
+        "testStrategy": "Write unit tests that verify:\n1. Different log levels work correctly\n2. Console logging works\n3. File logging works\n4. Ping results are logged correctly\n5. Application events are logged correctly",
+        "priority": "medium",
+        "dependencies": [
+          1,
+          4
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 7,
+        "title": "Create Main Application Class",
+        "description": "Implement the main Uptime Agent application class that integrates all components",
+        "details": "Create a main `UptimeAgent` class that:\n\n1. Initializes and connects all components\n2. Provides a simple API for starting/stopping the agent\n3. Handles configuration changes\n4. Manages the lifecycle of the application\n\n```python\nfrom .config import ConfigManager\nfrom .http_client import HTTPClient\nfrom .scheduler import Scheduler\nfrom .logger import Logger\nfrom .models import AppEndpoint\n\nclass UptimeAgent:\n    def __init__(self, config_path=None):\n        # Initialize components\n        self.config = ConfigManager(config_path)\n        self.logger = Logger(\n            log_level=self.config.get('log_level'),\n            log_file=self.config.get('log_file')\n        )\n        self.http_client = HTTPClient(timeout=self.config.get('timeout', 10))\n        self.scheduler = Scheduler(self.http_client)\n        \n        # Log startup\n        self.logger.log_event('STARTUP', 'Uptime Agent initializing')\n        \n        # Register endpoints from config\n        self._register_endpoints()\n    \n    def _register_endpoints(self):\n        for endpoint_config in self.config.get('endpoints', []):\n            url = endpoint_config['url']\n            interval = endpoint_config.get(\n                'interval', \n                self.config.get('default_interval')\n            )\n            endpoint = AppEndpoint(url, interval)\n            self.scheduler.add_endpoint(endpoint)\n            self.logger.log_event(\n                'REGISTER', \n                f'Registered endpoint: {url} (interval: {interval}s)'\n            )\n    \n    def start(self):\n        self.logger.log_event('START', 'Starting Uptime Agent')\n        self.scheduler.start()\n    \n    def stop(self):\n        self.logger.log_event('STOP', 'Stopping Uptime Agent')\n        self.scheduler.stop()\n    \n    def add_endpoint(self, url, interval=None):\n        if interval is None:\n            interval = self.config.get('default_interval')\n        endpoint = AppEndpoint(url, interval)\n        self.scheduler.add_endpoint(endpoint)\n        self.logger.log_event(\n            'ADD', \n            f'Added endpoint: {url} (interval: {interval}s)'\n        )\n    \n    def remove_endpoint(self, url):\n        self.scheduler.remove_endpoint(url)\n        self.logger.log_event('REMOVE', f'Removed endpoint: {url}')\n    \n    def get_status(self):\n        # Return status of all endpoints\n        return {\n            url: data['endpoint'] \n            for url, data in self.scheduler.endpoints.items()\n        }\n```",
+        "testStrategy": "Write integration tests that verify:\n1. The agent initializes correctly with all components\n2. Endpoints from configuration are registered correctly\n3. The agent can be started and stopped\n4. Endpoints can be added and removed at runtime\n5. Status information can be retrieved",
+        "priority": "high",
+        "dependencies": [
+          2,
+          3,
+          4,
+          5,
+          6
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 8,
+        "title": "Implement CLI Interface",
+        "description": "Create a command-line interface for the Uptime Agent",
+        "details": "Create a CLI interface that:\n\n1. Allows starting/stopping the agent\n2. Displays status information\n3. Supports adding/removing endpoints\n4. Shows logs\n\nCreate a `cli.py` file:\n\n```python\nimport argparse\nimport time\nimport sys\nfrom uptime_agent import UptimeAgent\n\ndef main():\n    parser = argparse.ArgumentParser(description='Uptime Agent CLI')\n    parser.add_argument(\n        '--config', '-c',\n        help='Path to configuration file'\n    )\n    parser.add_argument(\n        '--add', '-a',\n        help='Add an endpoint URL'\n    )\n    parser.add_argument(\n        '--remove', '-r',\n        help='Remove an endpoint URL'\n    )\n    parser.add_argument(\n        '--interval', '-i',\n        type=int,\n        help='Interval in seconds (for --add)'\n    )\n    parser.add_argument(\n        '--status', '-s',\n        action='store_true',\n        help='Show status and exit'\n    )\n    \n    args = parser.parse_args()\n    \n    # Initialize the agent\n    agent = UptimeAgent(config_path=args.config)\n    \n    # Handle commands\n    if args.add:\n        agent.add_endpoint(args.add, args.interval)\n        print(f\"Added endpoint: {args.add}\")\n        return\n    \n    if args.remove:\n        agent.remove_endpoint(args.remove)\n        print(f\"Removed endpoint: {args.remove}\")\n        return\n    \n    if args.status:\n        status = agent.get_status()\n        print(\"Uptime Agent Status:\")\n        for url, endpoint in status.items():\n            print(f\"  {url}: {endpoint.status} (last ping: {endpoint.last_ping})\")\n        return\n    \n    # Start the agent\n    try:\n        print(\"Starting Uptime Agent (Ctrl+C to stop)...\")\n        agent.start()\n        while True:\n            time.sleep(1)\n    except KeyboardInterrupt:\n        print(\"\\nStopping Uptime Agent...\")\n        agent.stop()\n\nif __name__ == '__main__':\n    main()\n```\n\nCreate an entry point in `setup.py` for the CLI.",
+        "testStrategy": "Test the CLI by:\n1. Running with different command-line arguments\n2. Verifying that commands are processed correctly\n3. Checking that output is displayed correctly\n4. Testing keyboard interrupt handling",
+        "priority": "medium",
+        "dependencies": [
+          7
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 9,
+        "title": "Implement Deployment Options",
+        "description": "Create deployment configurations for different environments",
+        "details": "Implement deployment configurations for:\n\n1. GitHub Actions:\n   Create a GitHub Actions workflow file (`.github/workflows/uptime-agent.yml`):\n   ```yaml\n   name: Uptime Agent\n   \n   on:\n     schedule:\n       - cron: '*/5 * * * *'  # Run every 5 minutes\n   \n   jobs:\n     ping:\n       runs-on: ubuntu-latest\n       steps:\n         - uses: actions/checkout@v2\n         - name: Set up Python\n           uses: actions/setup-python@v2\n           with:\n             python-version: '3.9'\n         - name: Install dependencies\n           run: |\n             python -m pip install --upgrade pip\n             pip install -e .\n         - name: Run Uptime Agent\n           run: uptime-agent --config config.yml --status\n   ```\n\n2. Docker:\n   Create a `Dockerfile`:\n   ```dockerfile\n   FROM python:3.9-slim\n   \n   WORKDIR /app\n   \n   COPY . .\n   RUN pip install -e .\n   \n   CMD [\"uptime-agent\", \"--config\", \"/app/config.yml\"]\n   ```\n\n3. Serverless (AWS Lambda):\n   Create a `serverless.yml` file:\n   ```yaml\n   service: uptime-agent\n   \n   provider:\n     name: aws\n     runtime: python3.9\n     memorySize: 128\n     timeout: 30\n   \n   functions:\n     ping:\n       handler: lambda_handler.handler\n       events:\n         - schedule: rate(5 minutes)\n   ```\n\n   Create a `lambda_handler.py` file:\n   ```python\n   import json\n   from uptime_agent import UptimeAgent\n   \n   def handler(event, context):\n       agent = UptimeAgent('config.yml')\n       \n       # Run once and get status\n       for url, endpoint_data in agent.scheduler.endpoints.items():\n           agent.http_client.ping_and_log(url)\n       \n       status = agent.get_status()\n       return {\n           'statusCode': 200,\n           'body': json.dumps({\n               'message': 'Uptime Agent ran successfully',\n               'endpoints': len(status)\n           })\n       }\n   ```\n\nProvide documentation for each deployment option in the README.",
+        "testStrategy": "Test each deployment option by:\n1. Setting up a test environment for each platform\n2. Verifying that the agent runs correctly in each environment\n3. Checking resource usage (memory, CPU)\n4. Testing configuration loading in each environment",
+        "priority": "medium",
+        "dependencies": [
+          7,
+          8
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 10,
+        "title": "Create Basic Dashboard (Phase 2)",
+        "description": "Implement a simple Streamlit dashboard for monitoring uptime",
+        "details": "Create a Streamlit dashboard that:\n\n1. Displays the status of all endpoints\n2. Shows uptime history\n3. Displays last ping time and response code\n4. Allows adding/removing endpoints\n\nCreate a `dashboard.py` file:\n\n```python\nimport streamlit as st\nimport pandas as pd\nimport time\nfrom datetime import datetime, timedelta\nfrom uptime_agent import UptimeAgent\n\nst.title('Uptime Agent Dashboard')\n\n# Initialize the agent\n@st.cache(allow_output_mutation=True)\ndef get_agent():\n    return UptimeAgent('config.yml')\n\nagent = get_agent()\n\n# Add new endpoint\nst.sidebar.header('Add Endpoint')\nwith st.sidebar.form('add_endpoint'):\n    url = st.text_input('URL')\n    interval = st.number_input('Interval (seconds)', min_value=120, value=300)\n    submit = st.form_submit_button('Add')\n    \n    if submit and url:\n        agent.add_endpoint(url, interval)\n        st.success(f'Added endpoint: {url}')\n\n# Status display\nst.header('Endpoint Status')\n\nstatus = agent.get_status()\nif not status:\n    st.info('No endpoints configured. Add one using the sidebar.')\nelse:\n    data = []\n    for url, endpoint in status.items():\n        data.append({\n            'URL': url,\n            'Status': endpoint.status,\n            'Last Ping': endpoint.last_ping or 'Never',\n            'Interval': f'{endpoint.interval} seconds',\n            'Failures': endpoint.failure_count\n        })\n    \n    df = pd.DataFrame(data)\n    st.dataframe(df)\n\n# Actions for each endpoint\nst.header('Actions')\nfor url in status.keys():\n    col1, col2 = st.columns(2)\n    with col1:\n        if st.button(f'Ping now: {url}'):\n            result, _ = agent.http_client.ping_and_log(url)\n            st.write(f\"Result: {result}\")\n    with col2:\n        if st.button(f'Remove: {url}'):\n            agent.remove_endpoint(url)\n            st.success(f'Removed endpoint: {url}')\n            st.experimental_rerun()\n\n# Auto-refresh\nst.sidebar.header('Dashboard Settings')\nauto_refresh = st.sidebar.checkbox('Auto-refresh', value=True)\nif auto_refresh:\n    refresh_interval = st.sidebar.slider('Refresh interval (seconds)', 5, 60, 10)\n    st.sidebar.write(f'Next refresh in {refresh_interval} seconds')\n    time.sleep(refresh_interval)\n    st.experimental_rerun()\n```\n\nAdd Streamlit to requirements.txt.",
+        "testStrategy": "Test the dashboard by:\n1. Running it locally\n2. Testing all UI interactions\n3. Verifying that data is displayed correctly\n4. Testing auto-refresh functionality\n5. Checking that endpoint actions work correctly",
+        "priority": "low",
+        "dependencies": [
+          7
+        ],
+        "status": "pending",
+        "subtasks": []
+      }
+    ],
+    "metadata": {
+      "created": "2025-10-01T03:41:57.226Z",
+      "updated": "2025-10-01T03:41:57.226Z",
+      "description": "Tasks for master context"
+    }
+  }
+}

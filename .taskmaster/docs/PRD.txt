@@ -1,0 +1,170 @@
+<context> # Overview The **Uptime Agent** is a lightweight service that prevents Streamlit (and other free-tier hosted) apps from going idle. Platforms like Streamlit Cloud automatically put apps to sleep after inactivity, leading to slow “cold starts” when users visit.
+
+The product solves the sleep/idle problem for developers and indie hackers by periodically pinging their web app endpoints. This ensures apps remain instantly accessible, providing a smoother user experience and eliminating downtime caused by forced idling.
+
+It’s valuable because it reduces friction for small teams and solo developers who can’t afford premium hosting tiers but need always-available apps.
+
+Core Features
+
+Ping Service
+
+What it does: Sends periodic HTTP GET requests to specified app URLs.
+
+Why it’s important: Keeps apps awake by simulating activity.
+
+How it works: Uses a lightweight scheduler to issue requests at configurable intervals (e.g., every 5 minutes).
+
+Configurable Intervals
+
+What it does: Lets users define ping frequency.
+
+Why it’s important: Balances uptime reliability with resource usage.
+
+How it works: Interval defined via .env, YAML/JSON config, or UI input.
+
+Multi-App Support
+
+What it does: Allows multiple endpoints to be monitored.
+
+Why it’s important: Many developers maintain multiple apps.
+
+How it works: Agent stores endpoints in config and loops through them on schedule.
+
+Optional Alerts (Stretch Goal)
+
+What it does: Notifies users if an app is unresponsive.
+
+Why it’s important: Helps detect outages.
+
+How it works: Retry mechanism + webhook/email integration.
+
+Simple Dashboard (Optional)
+
+What it does: Displays uptime history, last ping, and status.
+
+Why it’s important: Provides visibility into whether the agent is functioning.
+
+How it works: Lightweight web UI or CLI logs.
+
+User Experience
+
+Personas:
+
+Indie developer: Wants their demo app always up without paying extra hosting costs.
+
+Small dev team: Needs lightweight uptime without adopting full observability tools.
+
+Key User Flows:
+
+User installs/sets up agent.
+
+User registers one or more URLs.
+
+Agent starts pinging automatically.
+
+(Optional) User views logs or dashboard to confirm status.
+
+UI/UX Considerations:
+
+Minimal setup (config-first, UI optional).
+
+Transparency: simple logs confirming “ping successful.”
+
+Optional expansion into lightweight dashboard.
+
+</context>
+<PRD> # Technical Architecture - **System Components**: - Scheduler (e.g., Python `schedule` / APScheduler). - HTTP client (Requests / aiohttp). - Config manager (env file or JSON/YAML). - Optional alert system (email/Slack via webhook). - Optional dashboard (Streamlit or simple Flask UI).
+
+Data Models:
+
+AppEndpoint { url, interval, last_ping, status }.
+
+PingLog { timestamp, url, response_code, latency }.
+
+APIs and Integrations:
+
+Public URLs (GET requests).
+
+Email/Slack APIs for alerts (optional).
+
+Infrastructure Requirements:
+
+Deployable on GitHub Actions, small VM/container, or serverless function.
+
+Minimal CPU/memory footprint (<100MB).
+
+Development Roadmap
+
+MVP
+
+Config-driven URL pinger.
+
+Support multiple endpoints.
+
+Interval customization.
+
+CLI logs for visibility.
+
+Phase 2 (Enhancements)
+
+Retry-on-failure logic.
+
+Basic uptime metrics storage.
+
+Lightweight dashboard (Streamlit).
+
+Phase 3 (Advanced)
+
+Alerting (Slack/email).
+
+Multi-user support (shared deployment).
+
+SaaS model for hosted uptime monitoring.
+
+Logical Dependency Chain
+
+Foundation: Build core scheduler + HTTP ping mechanism.
+
+Config Layer: Allow multiple URLs + intervals.
+
+Logging: Provide visibility in CLI.
+
+Dashboard (Optional): Show last ping + simple status.
+
+Alerts (Optional): Add webhook/email integrations.
+
+SaaS Model (Stretch): Hosted service with multi-user onboarding.
+
+Risks and Mitigations
+
+Risk: Hosting providers may detect artificial traffic.
+
+Mitigation: Add jitter/randomization to ping intervals.
+
+Risk: Over-pinging could waste resources.
+
+Mitigation: Enforce sensible minimum intervals (e.g., 2 min).
+
+Risk: MVP scope creep into full monitoring solution.
+
+Mitigation: Keep MVP focused on uptime (pings only).
+
+Risk: GitHub Actions / free-tier runners may limit executions.
+
+Mitigation: Provide multiple deployment options (serverless, VM).
+
+Appendix
+
+Research Findings:
+
+Streamlit apps sleep after ~15 min inactivity on free tier.
+
+Simple uptime checks prevent cold starts.
+
+Technical Specs:
+
+Python preferred for alignment with Streamlit users.
+
+Minimal dependencies: requests, schedule, optional streamlit for dashboard.
+
+</PRD>
